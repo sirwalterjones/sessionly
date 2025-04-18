@@ -112,11 +112,11 @@ export async function createSession(formData: SessionWithDatesFormData) {
 }
 
 // Calculate available time slots for a session based on start time, end time, and duration
-export function calculateTimeSlots(
+export async function calculateTimeSlots(
   startTime: string,
   endTime: string,
   durationMinutes: number
-): string[] {
+): Promise<string[]> {
   const slots: string[] = [];
   
   // Parse start and end times
