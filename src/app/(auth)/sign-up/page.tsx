@@ -12,6 +12,9 @@ import { UrlProvider } from "@/components/url-provider";
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+// Force dynamic rendering because we use useSearchParams
+export const dynamic = 'force-dynamic';
+
 export default function Signup() {
   const searchParamsRaw = useSearchParams();
   const [message, setMessage] = useState<Message | null>(null);
