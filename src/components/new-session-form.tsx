@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
+import { useForm, type SubmitHandler } from 'react-hook-form'
 import * as z from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,17 +17,21 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { createSession, sessionFormSchema } from '@/app/actions/sessions'
+import { createSession } from '@/app/actions/sessions'
+import { sessionFormSchema } from '@/lib/schemas'
+import type { SessionFormData, SessionWithDatesFormData } from '@/lib/schemas'
 import { useToast } from '@/components/ui/use-toast'
 import { SubmitButton } from './submit-button'
 import { useState } from 'react'
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, UploadCloud } from 'lucide-react'
+import { CalendarIcon, MinusCircle, PlusCircle, UploadCloud } from 'lucide-react'
 import { format } from 'date-fns'
 import { uploadSessionImages, createSessionImageRecord } from '@/lib/storage-utils'
 
-const extendedSessionFormSchema = sessionFormSchema;
+// Infer the schema type for the form
+// No need to export this if only used here
+// type FormData = z.infer<typeof sessionFormSchema>
 
 export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const { toast } = useToast()
@@ -37,21 +41,24 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const [isUploading, setIsUploading] = useState(false)
 
   const form = useForm({
-    // @ts-ignore: To avoid type incompatibility issues
-    resolver: zodResolver(extendedSessionFormSchema),
+    resolver: zodResolver(sessionFormSchema),
     defaultValues: {
       name: '',
       description: '',
       duration: 30,
       price: 100,
-      deposit: 0,
+      deposit: undefined,
       depositRequired: false,
       locationName: '',
       address: '',
       locationNotes: '',
       startTime: '09:00',
       endTime: '17:00',
+      numberOfSpots: 1,
+      gapBetweenSlots: 0,
+      sameStartTime: false
     },
+    mode: 'onBlur'
   })
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,26 +67,18 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
     }
   }
 
-  // Handle image uploads after session creation
   async function handleImageUploads(sessionId: string) {
     if (!imageFiles || imageFiles.length === 0) return;
     
     setIsUploading(true);
     try {
-      // Convert FileList to array
       const files = Array.from(imageFiles);
-      
-      // Upload all images to Supabase Storage
       const { uploads, errorCount } = await uploadSessionImages(files, sessionId);
       
-      // Create database records for each successful upload
-      for (const upload of uploads) {
-        if (upload.path && upload.url) {
-          await createSessionImageRecord(sessionId, upload.path, upload.url);
-        }
-      }
+      await Promise.all(uploads.map(upload => 
+        upload.path && upload.url ? createSessionImageRecord(sessionId, upload.path, upload.url) : Promise.resolve()
+      ));
       
-      // Show upload status to user
       if (errorCount > 0) {
         toast({
           title: 'Image Upload Status',
@@ -104,7 +103,7 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
     }
   }
 
-  async function onSubmit(values: any) {
+  const onSubmit: SubmitHandler<z.infer<typeof sessionFormSchema>> = async (values) => {
     if (!selectedDates || selectedDates.length === 0) {
       toast({
         title: "Validation Error",
@@ -117,17 +116,14 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
     setIsSubmitting(true)
     
     try {
-      // Convert dates to yyyy-MM-dd format
       const formattedDates = selectedDates.map(date => format(date, 'yyyy-MM-dd'))
       
-      // Create the payload with all necessary data
-      const payload = {
+      const payload: SessionWithDatesFormData = {
         ...values,
         deposit: values.deposit ? Number(values.deposit) : undefined,
         selectedDates: formattedDates,
       }
       
-      // Call the server action
       const result = await createSession(payload)
 
       if (result.error) {
@@ -138,32 +134,28 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
         })
       } else {
         toast({
-          title: 'Session Created',
-          description: `Session "${values.name}" has been successfully created.`,
+          title: 'Success',
+          description: `Session "${values.name}" has been created.`,
         })
         
-        // Upload images if any are selected
         if (imageFiles && imageFiles.length > 0) {
-          await handleImageUploads(result.data.id);
+          await handleImageUploads(result.data.id)
         }
         
-        // Reset form and state
         form.reset()
         setSelectedDates(undefined)
         setImageFiles(null)
         
-        // Reset file input
         const fileInput = document.getElementById('session-images') as HTMLInputElement
         if (fileInput) fileInput.value = ''
         
-        // Close dialog if provided
         closeDialog?.()
       }
     } catch (error) {
       console.error('Session creation error:', error)
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
+        description: 'An unexpected error occurred during session creation. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -171,14 +163,12 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
     }
   }
 
-  // Return status text for submit button
   const getSubmitText = () => {
     if (isUploading) return 'Uploading Images...';
     if (isSubmitting) return 'Creating...';
     return 'Create Session';
   };
 
-  // Check if button should be disabled
   const isDisabled = isSubmitting || isUploading;
 
   return (
@@ -187,7 +177,6 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
         <CardTitle>Create New Session</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* @ts-ignore: Form component has compatibility issues with extended schema */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -220,15 +209,21 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                 </FormItem>
               )}
             />
-             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-               <FormField
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
                 control={form.control}
                 name="duration"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Slot Duration (minutes) *</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="15" {...field} value={field.value ?? ''} />
+                      <Input 
+                        type="number" 
+                        placeholder="15" 
+                        {...field} 
+                        onChange={(e) => field.onChange(+e.target.value)} 
+                        value={field.value ?? ''} 
+                      />
                     </FormControl>
                      <FormDescription>
                       How long is each bookable time slot?
@@ -244,7 +239,14 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                   <FormItem>
                     <FormLabel>Price ($) *</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="100.00" {...field} value={field.value ?? ''} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="100.00" 
+                        {...field} 
+                        onChange={(e) => field.onChange(+e.target.value)} 
+                        value={field.value ?? ''} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -259,7 +261,14 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                   <FormItem>
                     <FormLabel>Deposit ($)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="50.00" {...field} value={field.value ?? ''} />
+                       <Input 
+                         type="number" 
+                         step="0.01" 
+                         placeholder="50.00" 
+                         {...field} 
+                         onChange={(e) => field.onChange(e.target.value === '' ? undefined : +e.target.value)}
+                         value={field.value ?? ''} 
+                       />
                     </FormControl>
                     <FormDescription>
                       Optional retainer amount.
@@ -362,6 +371,93 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                 Select one or more dates when this session will be held.
               </FormDescription>
             </FormItem>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="numberOfSpots"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Spots</FormLabel>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => field.onChange(Math.max(1, (field.value ?? 1) - 1))}
+                      >
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          min={1}
+                          className="w-20 text-center"
+                          onChange={(e) => field.onChange(+e.target.value)}
+                          value={field.value ?? ''} 
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => field.onChange((field.value ?? 0) + 1)}
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="gapBetweenSlots"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gap Between Slots (minutes)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        onChange={(e) => field.onChange(+e.target.value)}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Time between consecutive slots
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="sameStartTime"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Set the same start time for all spots
+                    </FormLabel>
+                    <FormDescription>
+                      Great for classes, workshops, and group events.
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
@@ -393,7 +489,6 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                   )}
                 />
             </div>
-
             <FormItem>
                 <FormLabel>Promotional Images</FormLabel>
                 <FormControl>
@@ -402,10 +497,10 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                  <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
                                  <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                 <p className="text-xs text-muted-foreground">SVG, PNG, JPG or GIF (MAX. 800x400px)</p>
+                                 <p className="text-xs text-muted-foreground">Max 5 images (PNG, JPG, GIF, WEBP)</p>
                                  {imageFiles && <p className="mt-2 text-xs text-foreground">{imageFiles.length} file(s) selected</p>}
                              </div>
-                             <Input id="session-images" name="session_images" type="file" className="hidden" multiple onChange={handleImageChange} accept="image/*" />
+                             <Input id="session-images" name="session_images" type="file" className="hidden" multiple onChange={handleImageChange} accept="image/png, image/jpeg, image/gif, image/webp" />
                          </label>
                      </div> 
                 </FormControl>
@@ -414,7 +509,6 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                 </FormDescription>
                 <FormMessage />
             </FormItem>
-
             <div className="flex justify-end space-x-2 pt-4">
                 {closeDialog && (
                     <Button 
