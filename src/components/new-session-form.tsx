@@ -20,11 +20,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createSession, sessionFormSchema } from '@/app/actions/sessions'
 import { useToast } from '@/components/ui/use-toast'
 import { SubmitButton } from './submit-button'
+import { useState } from 'react'
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, UploadCloud } from 'lucide-react'
+import { format } from 'date-fns'
+
+const extendedSessionFormSchema = sessionFormSchema.extend({
+  startTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+})
 
 export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const { toast } = useToast()
+  const [selectedDates, setSelectedDates] = useState<Date[] | undefined>()
+  const [imageFiles, setImageFiles] = useState<FileList | null>(null)
+
   const form = useForm({
-    resolver: zodResolver(sessionFormSchema),
+    resolver: zodResolver(extendedSessionFormSchema),
     defaultValues: {
       name: '',
       description: '',
@@ -35,16 +48,35 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
       locationName: '',
       address: '',
       locationNotes: '',
+      startTime: '09:00',
+      endTime: '17:00',
     },
   })
 
-  async function onSubmit(values: z.infer<typeof sessionFormSchema>) {
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      setImageFiles(event.target.files)
+    }
+  }
+
+  async function onSubmit(values: any) {
+    if (!selectedDates || selectedDates.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select at least one date for the session.",
+        variant: "destructive",
+      })
+      return
+    }
+
     const payload = {
       ...values,
       deposit: values.deposit ? Number(values.deposit) : undefined,
-    };
+      selectedDates: selectedDates.map(date => format(date, 'yyyy-MM-dd')),
+    }
+    console.log("Submitting Payload:", payload)
 
-    const result = await createSession(payload);
+    const result = { error: 'createSession needs update' }
 
     if (result.error) {
       toast({
@@ -54,16 +86,20 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
       })
     } else {
       toast({
-        title: 'Session Created',
-        description: `Session "${values.name}" has been successfully created.`,
+        title: 'Session Created (Placeholder)',
+        description: `Session "${values.name}" structure ready.`,
       })
-      form.reset();
-      closeDialog?.();
+      form.reset()
+      setSelectedDates(undefined)
+      setImageFiles(null)
+      const fileInput = document.getElementById('session-images') as HTMLInputElement
+      if (fileInput) fileInput.value = ''
+      closeDialog?.()
     }
   }
 
   return (
-    <Card>
+    <Card className="max-h-[90vh] overflow-y-auto">
       <CardHeader>
         <CardTitle>Create New Session</CardTitle>
       </CardHeader>
@@ -106,10 +142,13 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                 name="duration"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Duration (minutes) *</FormLabel>
+                    <FormLabel>Slot Duration (minutes) *</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="30" {...field} value={field.value ?? ''} />
+                      <Input type="number" placeholder="15" {...field} value={field.value ?? ''} />
                     </FormControl>
+                     <FormDescription>
+                      How long is each bookable time slot?
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -208,7 +247,91 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                 </FormItem>
               )}
             />
-            <div className="flex justify-end space-x-2">
+            <FormItem>
+              <FormLabel>Session Dates *</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={`w-full pl-3 text-left font-normal ${
+                        !selectedDates && "text-muted-foreground"
+                      }`}
+                    >
+                      {selectedDates && selectedDates.length > 0
+                        ? selectedDates.map(date => format(date, "PPP")).join(", ")
+                        : "Pick date(s)"}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="multiple"
+                    selected={selectedDates}
+                    onSelect={setSelectedDates}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                Select one or more dates when this session will be held.
+              </FormDescription>
+            </FormItem>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Daily Start Time *</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormDescription>Start time for all selected dates.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Daily End Time *</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                       <FormDescription>End time for all selected dates.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+
+            <FormItem>
+                <FormLabel>Promotional Images</FormLabel>
+                <FormControl>
+                    <div className="flex items-center justify-center w-full">
+                         <label htmlFor="session-images" className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted transition-colors">
+                             <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                 <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
+                                 <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                 <p className="text-xs text-muted-foreground">SVG, PNG, JPG or GIF (MAX. 800x400px)</p>
+                                 {imageFiles && <p className="mt-2 text-xs text-foreground">{imageFiles.length} file(s) selected</p>}
+                             </div>
+                             <Input id="session-images" name="session_images" type="file" className="hidden" multiple onChange={handleImageChange} accept="image/*" />
+                         </label>
+                     </div> 
+                </FormControl>
+                <FormDescription>
+                    Upload images to display on the public booking page gallery.
+                </FormDescription>
+                <FormMessage />
+            </FormItem>
+
+            <div className="flex justify-end space-x-2 pt-4">
                 {closeDialog && (
                     <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
                 )}
