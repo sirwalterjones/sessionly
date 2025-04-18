@@ -181,6 +181,7 @@ export default function Dashboard() {
 
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
+            <DialogTitle>Create New Session</DialogTitle>
           </DialogHeader>
           <NewSessionForm closeDialog={closeDialog} />
         </DialogContent>
