@@ -74,12 +74,19 @@ export async function createSession(formData: SessionWithDatesFormData) {
     .insert(availabilityRecords);
 
   if (availabilityError) {
-    console.error("Supabase Availability Insert Error:", availabilityError);
+    // Enhanced logging
+    console.error(
+      "Supabase Availability Insert Error:", 
+      JSON.stringify(availabilityError, null, 2) // Log the full error object
+    );
+    console.error("Availability Records Payload:", JSON.stringify(availabilityRecords, null, 2)); // Log the data being inserted
     
     // Attempt to clean up the session record if availability insert fails
     await supabase.from("sessions").delete().eq("id", sessionRecord.id);
     
-    return { error: `Failed to create session availability: ${availabilityError.message}`, data: null };
+    // Try to return a more specific message if possible
+    const message = availabilityError.message || "Unknown error during availability insert.";
+    return { error: `Failed to create session availability: ${message}`, data: null };
   }
 
   // Handle image uploads if provided (would be implemented in a separate step)
