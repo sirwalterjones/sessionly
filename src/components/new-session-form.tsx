@@ -25,6 +25,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, UploadCloud } from 'lucide-react'
 import { format } from 'date-fns'
+import { uploadSessionImages, createSessionImageRecord } from '@/lib/storage-utils'
 
 const extendedSessionFormSchema = sessionFormSchema;
 
@@ -33,6 +34,7 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const [selectedDates, setSelectedDates] = useState<Date[] | undefined>()
   const [imageFiles, setImageFiles] = useState<FileList | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const form = useForm({
     // @ts-ignore: To avoid type incompatibility issues
@@ -55,6 +57,50 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setImageFiles(event.target.files)
+    }
+  }
+
+  // Handle image uploads after session creation
+  async function handleImageUploads(sessionId: string) {
+    if (!imageFiles || imageFiles.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      // Convert FileList to array
+      const files = Array.from(imageFiles);
+      
+      // Upload all images to Supabase Storage
+      const { uploads, errorCount } = await uploadSessionImages(files, sessionId);
+      
+      // Create database records for each successful upload
+      for (const upload of uploads) {
+        if (upload.path && upload.url) {
+          await createSessionImageRecord(sessionId, upload.path, upload.url);
+        }
+      }
+      
+      // Show upload status to user
+      if (errorCount > 0) {
+        toast({
+          title: 'Image Upload Status',
+          description: `${uploads.length - errorCount}/${uploads.length} images uploaded successfully.`,
+          variant: errorCount === uploads.length ? 'destructive' : 'default',
+        });
+      } else {
+        toast({
+          title: 'Images Uploaded',
+          description: `All ${uploads.length} images uploaded successfully.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      toast({
+        title: 'Image Upload Error',
+        description: 'Some images failed to upload. Try uploading them later from the session details page.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
     }
   }
 
@@ -96,12 +142,9 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
           description: `Session "${values.name}" has been successfully created.`,
         })
         
-        // Handle image upload here if needed (separate from the form submission)
-        // Would need to implement uploading to Supabase Storage
+        // Upload images if any are selected
         if (imageFiles && imageFiles.length > 0) {
-          // For now, just log that we'd handle this
-          console.log(`Would upload ${imageFiles.length} images for session ${result.data.id}`)
-          // Implementation for image uploads would go here
+          await handleImageUploads(result.data.id);
         }
         
         // Reset form and state
@@ -127,6 +170,16 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
       setIsSubmitting(false)
     }
   }
+
+  // Return status text for submit button
+  const getSubmitText = () => {
+    if (isUploading) return 'Uploading Images...';
+    if (isSubmitting) return 'Creating...';
+    return 'Create Session';
+  };
+
+  // Check if button should be disabled
+  const isDisabled = isSubmitting || isUploading;
 
   return (
     <Card className="max-h-[90vh] overflow-y-auto">
@@ -364,10 +417,17 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
 
             <div className="flex justify-end space-x-2 pt-4">
                 {closeDialog && (
-                    <Button type="button" variant="outline" onClick={closeDialog} disabled={isSubmitting}>Cancel</Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={closeDialog} 
+                      disabled={isDisabled}
+                    >
+                      Cancel
+                    </Button>
                 )}
-                <SubmitButton disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Session'}
+                <SubmitButton disabled={isDisabled}>
+                  {getSubmitText()}
                 </SubmitButton>
             </div>
           </form>
