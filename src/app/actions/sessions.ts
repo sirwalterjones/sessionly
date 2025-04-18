@@ -2,31 +2,12 @@
 
 import { createClient } from "../../../supabase/server";
 import { revalidatePath } from "next/cache";
-import * as z from "zod";
+import { sessionFormSchema, SessionWithDatesFormData } from "@/lib/schemas"; // Import from the new schema file
 
-// Define Zod schema matching the form
-export const sessionFormSchema = z.object({
-  name: z.string().min(2),
-  description: z.string().optional(),
-  duration: z.number().int().positive(),
-  price: z.number().positive(),
-  deposit: z.number().nonnegative().optional(),
-  depositRequired: z.boolean().default(false),
-  locationName: z.string().optional(),
-  address: z.string().optional(),
-  locationNotes: z.string().optional(),
-  // Add new time fields 
-  startTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
-  endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
-});
-
-// Extended schema type that includes the dates array
-export type SessionWithDatesFormData = z.infer<typeof sessionFormSchema> & {
-  selectedDates: string[]; // Array of date strings in YYYY-MM-DD format
-};
-
-// Infer the type from the Zod schema for basic session data
-export type SessionFormData = z.infer<typeof sessionFormSchema>;
+// Remove the schema and type definitions from here
+// export const sessionFormSchema = z.object({ ... });
+// export type SessionWithDatesFormData = z.infer<typeof sessionFormSchema> & { ... };
+// export type SessionFormData = z.infer<typeof sessionFormSchema>;
 
 export async function createSession(formData: SessionWithDatesFormData) {
   const supabase = await createClient();

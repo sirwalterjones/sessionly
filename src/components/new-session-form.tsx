@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, type SubmitHandler } from 'react-hook-form'
 import * as z from 'zod'
-import { Button } from './ui/button'
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -12,22 +12,22 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from './ui/form'
-import { Input } from './ui/input'
-import { Textarea } from './ui/textarea'
-import { Checkbox } from './ui/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { createSession } from '../app/actions/sessions'
-import { sessionFormSchema } from '../lib/schemas'
-import type { SessionFormData, SessionWithDatesFormData } from '../lib/schemas'
-import { useToast } from './ui/use-toast'
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { createSession } from '@/app/actions/sessions'
+import { sessionFormSchema } from '@/lib/schemas'
+import type { SessionFormData, SessionWithDatesFormData } from '@/lib/schemas'
+import { useToast } from '@/components/ui/use-toast'
 import { SubmitButton } from './submit-button'
 import { useState } from 'react'
-import { Calendar } from "./ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, MinusCircle, PlusCircle, UploadCloud } from 'lucide-react'
 import { format } from 'date-fns'
-import { uploadSessionImages, createSessionImageRecord } from '../lib/storage-utils'
+import { uploadSessionImages, createSessionImageRecord } from '@/lib/storage-utils'
 
 // Infer the schema type for the form
 // No need to export this if only used here

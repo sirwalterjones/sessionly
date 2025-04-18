@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { NewSessionForm } from "@/components/new-session-form";
+import { NewSessionForm } from "../../components/new-session-form";
 import { Session } from '@supabase/supabase-js';
 
 // Assume SessionDbType represents the structure returned by getSessionsByUser
