@@ -188,7 +188,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Drawer Content slides in from the right */}
-        <DrawerContent className="h-full w-full max-w-2xl fixed bottom-0 right-0 mt-0 rounded-l-lg">
+        <DrawerContent className="h-full w-1/2 fixed bottom-0 right-0 mt-0 rounded-l-lg">
           {/* Added overflow-auto for potentially long form content */}
           <div className="mx-auto w-full p-4 overflow-auto h-full">
             <DrawerHeader className="pb-4">
