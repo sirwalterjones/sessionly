@@ -15,12 +15,15 @@ import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/dashboard-layout";
 import { getSessionsByUser } from "../actions/sessions";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { NewSessionForm } from "../../components/new-session-form";
 import { Session } from '@supabase/supabase-js';
 
@@ -50,7 +53,8 @@ export default function Dashboard() {
   // Explicitly type the state with the expected Session structure array
   const [sessions, setSessions] = useState<SessionDbType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  // State to control drawer open/close
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const checkUserAndFetchData = async () => {
@@ -86,11 +90,13 @@ export default function Dashboard() {
     return <div>Loading...</div>;
   }
 
-  const closeDialog = () => setIsDialogOpen(false);
+  // Function to close the drawer, passed to the form
+  const closeDrawer = () => setIsDrawerOpen(false);
 
   return (
     <DashboardLayout user={userSession.user}>
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Use Drawer component root */}
+      <Drawer direction="right" open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -98,11 +104,12 @@ export default function Dashboard() {
               Overview of your photography sessions.
             </p>
           </div>
-          <DialogTrigger asChild>
+          {/* Use DrawerTrigger to open the drawer */}
+          <DrawerTrigger asChild>
             <Button>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Session
             </Button>
-          </DialogTrigger>
+          </DrawerTrigger>
         </header>
 
         <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center mt-4">
@@ -169,23 +176,37 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <p className="text-muted-foreground mb-4">Ready to start booking?</p>
-                <DialogTrigger asChild>
+                {/* Use DrawerTrigger here as well if this button should also open it */}
+                <DrawerTrigger asChild>
                    <Button>
                        <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Session
                    </Button>
-                </DialogTrigger>
+                </DrawerTrigger>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Create New Session</DialogTitle>
-          </DialogHeader>
-          <NewSessionForm closeDialog={closeDialog} />
-        </DialogContent>
-      </Dialog>
+        {/* Drawer Content slides in from the right */}
+        <DrawerContent className="h-full w-full max-w-2xl fixed bottom-0 right-0 mt-0 rounded-l-lg">
+          {/* Added overflow-auto for potentially long form content */}
+          <div className="mx-auto w-full p-4 overflow-auto h-full">
+            <DrawerHeader className="pb-4">
+              <DrawerTitle>Create New Session</DrawerTitle>
+              <DrawerDescription>Fill in the details for your new session.</DrawerDescription>
+            </DrawerHeader>
+            {/* Pass closeDrawer instead of closeDialog */}
+            <NewSessionForm closeDialog={closeDrawer} />
+            {/* Removed DrawerFooter as form has its own submit/cancel */}
+            {/* <DrawerFooter>
+              <Button>Submit</Button>
+              <DrawerClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter> */}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </DashboardLayout>
   );
 }
