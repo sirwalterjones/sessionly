@@ -1,51 +1,71 @@
+'use client';
+
 import Link from "next/link";
-import { createClient } from "../../supabase/server";
+import { createClient } from "../../supabase/client";
 import { Button } from "./ui/button";
-import { Camera, UserCircle } from "lucide-react";
+import { Camera } from "lucide-react";
 import UserProfile from "./user-profile";
+import { useEffect, useState } from 'react';
+import { User } from '@supabase/supabase-js';
 
-export default async function Navbar() {
+export default function Navbar() {
   const supabase = createClient();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const {
-    data: { user },
-  } = await (await supabase).auth.getUser();
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user) {
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    };
+
+    fetchUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   return (
-    <nav className="w-full border-b border-gray-200 bg-white py-2">
+    <nav className="w-full border-b border-border bg-background py-2 sticky top-0 z-50">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link
           href="/"
-          prefetch
+          prefetch={false}
           className="text-xl font-bold flex items-center gap-2"
         >
-          <Camera className="h-6 w-6 text-blue-600" />
+          <Camera className="h-6 w-6 text-primary" />
           <span>Sessionly</span>
         </Link>
         <div className="flex gap-4 items-center">
-          {user ? (
+          {loading ? (
+            <div className="h-8 w-24 bg-muted rounded animate-pulse"></div>
+          ) : user ? (
             <>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                <Button>Dashboard</Button>
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm">Dashboard</Button>
               </Link>
               <UserProfile />
             </>
           ) : (
             <>
-              <Link
-                href="/sign-in"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Sign In
+              <Link href="/sign-in">
+                <Button variant="ghost" size="sm">Sign In</Button>
               </Link>
-              <Link
-                href="/sign-up"
-                className="px-4 py-2 text-sm font-medium text-white bg-black rounded-md hover:bg-gray-800"
-              >
-                Sign Up
+              <Link href="/sign-up">
+                 <Button size="sm">Sign Up</Button>
               </Link>
             </>
           )}
