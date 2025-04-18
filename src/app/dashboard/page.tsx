@@ -189,22 +189,19 @@ export default function Dashboard() {
 
         {/* Drawer Content slides in from the right */}
         <DrawerContent className="fixed inset-y-0 right-0 z-50 flex h-full w-1/2 flex-col rounded-l-lg border bg-background">
-          {/* Added overflow-auto for potentially long form content */}
-          <div className="w-full p-6 overflow-auto h-full">
-            <DrawerHeader className="pb-4 text-left">
+          {/* Remove intermediate div, apply padding directly */} 
+          {/* <div className="w-full p-6 overflow-auto h-full"> */}
+            <DrawerHeader className="p-6 pb-4 text-left"> {/* Add padding to header */} 
               <DrawerTitle>Create New Session</DrawerTitle>
               <DrawerDescription>Fill in the details for your new session.</DrawerDescription>
             </DrawerHeader>
-            {/* Pass closeDrawer instead of closeDialog */}
-            <NewSessionForm closeDialog={closeDrawer} />
+            {/* Wrapper for form content, handles flex grow and scrolling */} 
+            <div className="flex-1 px-6 pb-6 overflow-y-auto">
+              {/* Pass closeDrawer instead of closeDialog */}
+              <NewSessionForm closeDialog={closeDrawer} />
+            </div>
             {/* Removed DrawerFooter as form has its own submit/cancel */}
-            {/* <DrawerFooter>
-              <Button>Submit</Button>
-              <DrawerClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DrawerClose>
-            </DrawerFooter> */}
-          </div>
+          {/* </div> */}
         </DrawerContent>
       </Drawer>
     </DashboardLayout>
