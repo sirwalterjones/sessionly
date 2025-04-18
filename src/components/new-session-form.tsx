@@ -21,11 +21,9 @@ import { createSession, sessionFormSchema } from '@/app/actions/sessions'
 import { useToast } from '@/components/ui/use-toast'
 import { SubmitButton } from './submit-button'
 
-type FormValues = z.infer<typeof sessionFormSchema>
-
 export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
   const { toast } = useToast()
-  const form = useForm<FormValues>({
+  const form = useForm({
     resolver: zodResolver(sessionFormSchema),
     defaultValues: {
       name: '',
@@ -40,7 +38,7 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
     },
   })
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: z.infer<typeof sessionFormSchema>) {
     const payload = {
       ...values,
       deposit: values.deposit ? Number(values.deposit) : undefined,
@@ -110,7 +108,6 @@ export function NewSessionForm({ closeDialog }: { closeDialog?: () => void }) {
                   <FormItem>
                     <FormLabel>Duration (minutes) *</FormLabel>
                     <FormControl>
-                      {/* Input type="number" handles string conversion, but ensure value is string/number */}
                       <Input type="number" placeholder="30" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
