@@ -17,21 +17,48 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Add RLS (Row Level Security) policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- Create policies if they don't exist
+-- Create SELECT policy if it doesn't exist
 DO $$
 BEGIN
-    -- Check if the policy for users exists
     IF NOT EXISTS (
         SELECT 1 FROM pg_policies 
         WHERE schemaname = 'public' 
         AND tablename = 'users' 
         AND policyname = 'Users can view own data'
     ) THEN
-        -- Create policy to allow users to see only their own data
         EXECUTE 'CREATE POLICY "Users can view own data" ON public.users
-                FOR SELECT USING (auth.uid()::text = user_id)';
+                FOR SELECT USING (auth.uid() = id)'; -- Match against primary key 'id'
     END IF;
+END
+$$;
 
+-- Create INSERT policy if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+        AND tablename = 'users'
+        AND policyname = 'Users can insert own data'
+    ) THEN
+        EXECUTE 'CREATE POLICY "Users can insert own data" ON public.users
+                FOR INSERT WITH CHECK (auth.uid() = id)'; -- Allow insert if id matches auth.uid()
+    END IF;
+END
+$$;
+
+-- Create UPDATE policy if it doesn't exist (Good practice to add this too)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+        AND tablename = 'users'
+        AND policyname = 'Users can update own data'
+    ) THEN
+        EXECUTE 'CREATE POLICY "Users can update own data" ON public.users
+                FOR UPDATE USING (auth.uid() = id)'; -- Allow update if id matches auth.uid()
+    END IF;
 END
 $$;
 

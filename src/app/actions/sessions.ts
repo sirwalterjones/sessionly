@@ -2,24 +2,34 @@
 
 import { createClient } from "../../../supabase/server";
 import { revalidatePath } from "next/cache";
+import * as z from "zod";
 
-export type SessionFormData = {
-  title: string;
-  description: string;
-  price: number;
-  duration: number;
-  location: string;
-  locationDetails?: string;
-  startDate?: string;
-  endDate?: string;
-  timeSlots?: { start: string; end: string }[];
-  images?: string[];
-  attachments?: string[];
-  published: boolean;
-};
+// Define Zod schema matching the form
+export const sessionFormSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().optional(),
+  duration: z.number().int().positive(),
+  price: z.number().positive(),
+  deposit: z.number().nonnegative().optional(),
+  depositRequired: z.boolean().default(false),
+  locationName: z.string().optional(),
+  address: z.string().optional(),
+  locationNotes: z.string().optional(),
+});
+
+// Infer the type from the Zod schema
+export type SessionFormData = z.infer<typeof sessionFormSchema>;
 
 export async function createSession(formData: SessionFormData) {
   const supabase = await createClient();
+
+  // Validate the input data using the Zod schema
+  const validatedData = sessionFormSchema.safeParse(formData);
+
+  if (!validatedData.success) {
+    console.error("Validation Error:", validatedData.error);
+    return { error: "Invalid form data provided.", data: null };
+  }
 
   const {
     data: { user },
@@ -29,35 +39,36 @@ export async function createSession(formData: SessionFormData) {
     return { error: "Not authenticated", data: null };
   }
 
+  // Use validated data for insertion, mapping form names to DB columns
   const { data, error } = await supabase
     .from("sessions")
     .insert([
       {
         user_id: user.id,
-        title: formData.title,
-        description: formData.description,
-        price: formData.price,
-        duration: formData.duration,
-        location: formData.location,
-        location_details: formData.locationDetails,
-        start_date: formData.startDate,
-        end_date: formData.endDate,
-        time_slots: formData.timeSlots,
-        images: formData.images,
-        attachments: formData.attachments,
-        published: formData.published,
+        name: validatedData.data.name,
+        description: validatedData.data.description,
+        duration: validatedData.data.duration,
+        price: validatedData.data.price,
+        deposit: validatedData.data.deposit,
+        deposit_required: validatedData.data.depositRequired,
+        location_name: validatedData.data.locationName,
+        address: validatedData.data.address,
+        location_notes: validatedData.data.locationNotes,
       },
     ])
     .select()
     .single();
 
   if (error) {
-    return { error: error.message, data: null };
+    console.error("Supabase Insert Error:", error);
+    return { error: `Database error: ${error.message}`, data: null };
   }
 
-  revalidatePath("/dashboard/sessions");
-  revalidatePath("/dashboard");
+  // Revalidate paths that display session lists or details
+  revalidatePath("/dashboard"); // Assuming dashboard might show summary
+  // Add other relevant paths if needed, e.g., a dedicated "/sessions" page
 
+  console.log("Session created successfully:", data);
   return { data, error: null };
 }
 
